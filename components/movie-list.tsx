@@ -1,5 +1,5 @@
 import { fetchMovies, Movie } from "@/lib/movies"
-import { ColumnDef, flexRender, getCoreRowModel, PaginationState, useReactTable } from "@tanstack/react-table"
+import { ColumnDef, flexRender, getCoreRowModel, getSortedRowModel, PaginationState, SortingState, useReactTable } from "@tanstack/react-table"
 import { useMemo, useReducer, useState } from "react"
 import { useQuery } from "react-query"
 
@@ -8,6 +8,13 @@ export default function MovieTable() {
 
   const columns = useMemo<ColumnDef<Movie>[]>(
     () => [
+      {
+        header: () => '',
+        accessorKey: 'id',
+        cell: info => info.getValue(),
+        footer: props => props.column.id,
+        enableSorting: false,
+      },
       {
         header: () => <span>Name</span>,
         accessorKey: 'name',
@@ -25,6 +32,7 @@ export default function MovieTable() {
         accessorKey: 'director',
         header: () => <span>Director</span>,
         footer: props => props.column.id,
+        enableSorting: false,
       },
     ],
     []
@@ -35,10 +43,12 @@ export default function MovieTable() {
       pageIndex: 0,
       pageSize: 10,
     })
+  const [sorting, setSorting] = useState<SortingState>([])
 
   const fetchDataOptions = {
     pageIndex,
     pageSize,
+    sorting,
   }
 
   const dataQuery = useQuery(
@@ -63,10 +73,13 @@ export default function MovieTable() {
     pageCount: dataQuery.data?.pageCount ?? -1,
     state: {
       pagination,
+      sorting,
     },
     onPaginationChange: setPagination,
+    onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     manualPagination: true,
+    manualSorting: true,
     debugTable: true,
   })
 
@@ -78,13 +91,22 @@ export default function MovieTable() {
             <tr key={headerGroup.id}>
               {headerGroup.headers.map(header => {
                 return (
-                  <th key={header.id} colSpan={header.colSpan}>
+                  <th key={header.id} colSpan={header.colSpan} className="cursor-pointer">
                     {header.isPlaceholder ? null : (
-                      <div>
+                      <div {...{
+                        className: header.column.getCanSort()
+                          ? 'cursor-pointer select-none'
+                          : '',
+                        onClick: header.column.getToggleSortingHandler(),
+                      }}>
                         {flexRender(
                           header.column.columnDef.header,
                           header.getContext()
                         )}
+                        {{
+                          asc: ' 🔼',
+                          desc: ' 🔽',
+                        }[header.column.getIsSorted() as string] ?? null}
                       </div>
                     )}
                   </th>
@@ -154,6 +176,7 @@ export default function MovieTable() {
         </div>
         <div>
           <select
+            className="select"
             value={table.getState().pagination.pageSize}
             onChange={e => {
               table.setPageSize(Number(e.target.value))
